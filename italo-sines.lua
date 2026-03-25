@@ -356,6 +356,10 @@ function init()
   mm.on_volume = function(bi, val)
     if bands[bi] then
       bands[bi].velocity = val
+      -- Also send CC 7 (volume) so synths that ignore velocity still respond
+      if midi_out then
+        midi_out:cc(7, val, bands[bi].channel)
+      end
     end
   end
 
@@ -483,6 +487,7 @@ function enc(n, d)
       local b = bands[cursor]
       if b then
         b.velocity = util.clamp(b.velocity + d * 4, 0, 127)
+        if midi_out then midi_out:cc(7, b.velocity, b.channel) end
       end
     end
 
