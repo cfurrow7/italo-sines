@@ -367,8 +367,8 @@ function init()
     if not bands[bi] or not Band.is_melodic(bands[bi].role) then return end
     local b = bands[bi]
     if b.role == "bass" then
-      -- Knob 1 for bass = octave (-3 to +3)
-      b.octave = math.floor(val / 128 * 7) - 3
+      -- Knob 1 for bass = octave (-5 to +5)
+      b.octave = math.floor(val / 128 * 11) - 5
       generate_phrase(b)
     else
       -- Knob 1 for chord/lead = degree
@@ -508,7 +508,7 @@ function enc(n, d)
           b.channel = util.clamp(b.channel + d, 1, 16)
         elseif edit_field == 3 then
           -- Octave
-          b.octave = util.clamp(b.octave + d, -3, 3)
+          b.octave = util.clamp(b.octave + d, -5, 5)
           if b.role == "bass" or b.role == "lead" then generate_phrase(b) end
         elseif edit_field == 4 then
           if b.role == "chord" then
