@@ -39,9 +39,12 @@ local midi_out = nil
 local mm = nil             -- MIDIMIX
 
 -- Playback
-local playing = false
+-- playing is no longer used -- clock always runs, prog.active controls progression
 local sixteenth = 0        -- current 16th note counter (1-based within bar)
 local beat_count = 0       -- total beats elapsed
+-- Faders always gate voices in/out (like midi-sines).
+-- Bass plays patterns, chords arp, drums hit -- all clock-driven.
+-- Progression is separate from transport: toggle independently.
 
 -- Progression
 local prog = {
@@ -49,6 +52,7 @@ local prog = {
   steps = {1, 7, 6, 5},   -- current degree sequence
   position = 1,            -- current step (1-based)
   beats_per_step = 4,
+  active = false,          -- progression on/off (separate from play/stop)
 }
 
 -- Scale
@@ -80,7 +84,10 @@ end
 -- ===== CHORD / PHRASE GENERATION =====
 
 local function get_chord_root_degree()
-  return prog.steps[prog.position] or 1
+  if prog.active then
+    return prog.steps[prog.position] or 1
+  end
+  return 1  -- stay on root when progression is off
 end
 
 -- Get scale note for a degree at an octave
@@ -125,18 +132,19 @@ local function regenerate_all()
   end
 end
 
+
 -- ===== CLOCK =====
 
 local function advance_progression()
+  if not prog.active then return end
   prog.position = (prog.position % #prog.steps) + 1
   regenerate_all()
 end
 
 local function tick_band(b, step)
-  if b.muted then return end
+  if b.muted or b.velocity < 1 then return end
 
   if b.is_drum then
-    -- Drum: check pattern
     local vel = Drummer.get_vel(b.drum_kit, b.role, step)
     if vel > 0 then
       local note = Band.DRUM_NOTES[b.role] or 36
@@ -173,8 +181,8 @@ local function tick_band(b, step)
   if b.role == "bass" or b.role == "lead" then
     local arp_rate = Band.ARP_RATES[b.arp_rate] or 2
 
-    if b.arp_mode > 1 and b.role == "lead" then
-      -- Lead with arp: arpeggiate the phrase notes across octaves
+    if b.arp_mode > 1 then
+      -- Arp mode
       if (step - 1) % arp_rate == 0 then
         if #b.phrase > 0 then
           local mode_name = Band.ARP_MODES[b.arp_mode] or "up"
@@ -225,27 +233,26 @@ local function start_clock()
       sixteenth = sixteenth + 1
       local step = ((sixteenth - 1) % 16) + 1
 
-      if playing then
-        -- Tick all bands
+      -- Clock always runs (free-running, like midi-sines)
+      -- Tick all bands
+      for _, b in ipairs(bands) do
+        tick_band(b, step)
+      end
+
+      -- Release drum notes after a short time
+      clock.run(function()
+        clock.sleep(0.05)
         for _, b in ipairs(bands) do
-          tick_band(b, step)
+          if b.is_drum then Band.release(b, midi_out) end
         end
+      end)
 
-        -- Release drum notes after a short time
-        clock.run(function()
-          clock.sleep(0.05)
-          for _, b in ipairs(bands) do
-            if b.is_drum then Band.release(b, midi_out) end
-          end
-        end)
-
-        -- Advance progression on beat boundaries
-        if step == 1 then
-          beat_count = beat_count + 1
-        end
-        if (sixteenth - 1) % (prog.beats_per_step * 4) == 0 and sixteenth > 1 then
-          advance_progression()
-        end
+      -- Advance progression on beat boundaries (only when active)
+      if step == 1 then
+        beat_count = beat_count + 1
+      end
+      if prog.active and (sixteenth - 1) % (prog.beats_per_step * 4) == 0 and sixteenth > 1 then
+        advance_progression()
       end
 
       -- Decay flash counters
@@ -263,18 +270,22 @@ local function all_off()
   end
 end
 
-local function start_playing()
-  if playing then return end
-  playing = true
+local function start_progression()
+  prog.active = true
+  prog.position = 1
   sixteenth = 0
   beat_count = 0
-  prog.position = 1
   regenerate_all()
 end
 
-local function stop_playing()
-  playing = false
-  all_off()
+local function stop_progression()
+  prog.active = false
+  prog.position = 1
+  regenerate_all()  -- snap back to root
+end
+
+local function toggle_progression()
+  if prog.active then stop_progression() else start_progression() end
 end
 
 -- ===== INIT =====
@@ -349,9 +360,16 @@ function init()
   end
 
   mm.on_degree = function(bi, val)
-    if bands[bi] and Band.is_melodic(bands[bi].role) then
-      bands[bi].degree = math.floor(val / 128 * 7) + 1
-      if bands[bi].role ~= "chord" then generate_phrase(bands[bi]) end
+    if not bands[bi] or not Band.is_melodic(bands[bi].role) then return end
+    local b = bands[bi]
+    if b.role == "bass" then
+      -- Knob 1 for bass = octave (-3 to +3)
+      b.octave = math.floor(val / 128 * 7) - 3
+      generate_phrase(b)
+    else
+      -- Knob 1 for chord/lead = degree
+      b.degree = math.floor(val / 128 * 7) + 1
+      if b.role == "lead" then generate_phrase(b) end
     end
   end
 
@@ -415,7 +433,7 @@ function init()
   end
 
   mm.on_play_stop = function()
-    if playing then stop_playing() else start_playing() end
+    toggle_progression()
   end
 
   -- Auto-detect MIDI devices
@@ -438,11 +456,9 @@ function init()
   -- Generate initial phrases
   regenerate_all()
 
-  -- Start clock
+  -- Start clock (always running -- faders bring voices in/out)
   start_clock()
-
-  -- Auto-play!
-  start_playing()
+  -- Progression starts OFF. K2 to start it.
 
   -- Redraw clock
   clock.run(function()
@@ -582,7 +598,7 @@ function key(n, z)
 
   if page == 1 then
     if n == 2 then
-      if playing then stop_playing() else start_playing() end
+      toggle_progression()
     elseif n == 3 then
       -- Mute/unmute selected band
       if bands[cursor] then
@@ -618,7 +634,7 @@ function key(n, z)
 
   elseif page == 3 then
     if n == 2 then
-      if playing then stop_playing() else start_playing() end
+      toggle_progression()
     elseif n == 3 then
       -- Random progression
       prog.idx = math.random(1, Progressions.count())
@@ -689,9 +705,9 @@ function draw_play()
   screen.text(key_name() .. " " .. numeral .. " " .. bpm .. "bpm")
 
   -- Playing indicator
-  screen.level(playing and 15 or 3)
+  screen.level(prog.active and 15 or 3)
   screen.move(120, 7)
-  screen.text(playing and ">" or ".")
+  screen.text(prog.active and "PROG" or "I")
 
   -- Band columns
   local num = #bands
@@ -702,11 +718,11 @@ function draw_play()
     local x = (i - 1) * col_w + 2
     local selected = (i == cursor)
 
-    -- Activity bar (height = velocity when playing, flash on trigger)
+    -- Activity bar (height = velocity, flash on trigger)
     local bar_h = 0
     if b.flash > 0 then
       bar_h = 38
-    elseif not b.muted and playing then
+    elseif not b.muted and b.velocity > 0 then
       bar_h = math.floor(b.velocity / 127 * 30)
     end
 
@@ -856,7 +872,7 @@ function draw_prog()
   screen.move(0, 62)
   for i, step in ipairs(prog.steps) do
     local num = NUMERALS[step] or tostring(step)
-    if i == prog.position and playing then
+    if i == prog.position and prog.active then
       screen.level(15)
     else
       screen.level(5)
@@ -866,7 +882,7 @@ function draw_prog()
 
   screen.level(3)
   screen.move(128, 62)
-  screen.text_right("K3:random")
+  screen.text_right("K2:" .. (prog.active and "stop" or "start") .. " K3:rnd")
 end
 
 function draw_config()
