@@ -168,11 +168,8 @@ end
 -- Update mute LED for a slot
 function MidiMix:set_mute_led(slot, on)
   if self.midi and slot >= 1 and slot <= 8 then
-    if on then
-      self.midi:note_on(MUTE_NOTES[slot], 127, 1)
-    else
-      self.midi:note_off(MUTE_NOTES[slot], 0, 1)
-    end
+    -- MIDIMIX responds to note_on vel 127 = LED on, note_on vel 0 = LED off
+    self.midi:note_on(MUTE_NOTES[slot], on and 127 or 0, 1)
   end
 end
 
