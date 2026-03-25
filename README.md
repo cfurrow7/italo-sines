@@ -90,6 +90,18 @@ Phrases regenerate on every chord change to stay musically coherent.
 8 coordinated italo drum kits (kick + snare + hat + tom patterns designed together):
 Classic Italo, Moroder, Hi-NRG, Euro Disco, Cosmic, Minimal, Synth Pop, Funky Disco.
 
+## Internal Drum Engine
+
+Uses the Timber sample engine to play drum sounds directly from norns, no external drum machine needed. Loads kits from drum_room's sample library:
+
+- TR-808
+- TR-909
+- TR-606
+- CR-78
+- DMX
+
+Switch between internal and MIDI drum output in PARAMS. When using internal drums, MIDIMIX knob row 2 on drum bands cycles through sample kits.
+
 ## MIDIMIX Controller Map
 
 ```
@@ -110,9 +122,9 @@ Classic Italo, Moroder, Hi-NRG, Euro Disco, Cosmic, Minimal, Synth Pop, Funky Di
 
 ## On Startup
 
-Loads in A minor with the "italo classic" progression (i-VII-VI-V) at 120 BPM. All 9 bands active. Auto-plays immediately. Adjust from there.
+Loads in A minor with the "italo classic" progression (i-VII-VI-V) at 120 BPM. All bands start at velocity 0 (silent). Raise faders to bring voices in. Clock runs free; K2 toggles the chord progression independently.
 
 ## Credits
 
 - Inspired by [Sines](https://github.com/aidanreilly/sines) by Aidan Reilly
-- v0.1 @clf
+- v0.2 @clf

@@ -16,15 +16,20 @@
 --   H  hat     ch 15
 --   T  tom     ch 15
 --
--- v0.1 @clf
+-- v0.2 @clf
+
+engine.name = "Timber"
 
 local MusicUtil = require "musicutil"
 local Band = include("italo-sines/lib/band")
 local Chords = include("italo-sines/lib/chords")
 local Melody = include("italo-sines/lib/melody")
 local Drummer = include("italo-sines/lib/drummer")
+local DrumEngine = include("italo-sines/lib/drum_engine")
 local Progressions = include("italo-sines/lib/progressions")
 local MidiMix = include("italo-sines/lib/midimix")
+
+local drum_output = "internal"  -- "internal" = Timber engine, "midi" = MIDI out
 
 -- ===== CONSTANTS =====
 
@@ -147,8 +152,14 @@ local function tick_band(b, step)
   if b.is_drum then
     local vel = Drummer.get_vel(b.drum_kit, b.role, step)
     if vel > 0 then
-      local note = Band.DRUM_NOTES[b.role] or 36
-      Band.retrigger(b, midi_out, {note}, math.floor(vel * b.velocity / 127))
+      local combined_vel = math.floor(vel * b.velocity / 127)
+      if drum_output == "internal" then
+        DrumEngine.trigger(b.role, combined_vel)
+        b.flash = 4
+      else
+        local note = Band.DRUM_NOTES[b.role] or 36
+        Band.retrigger(b, midi_out, {note}, combined_vel)
+      end
     end
     return
   end
@@ -239,13 +250,15 @@ local function start_clock()
         tick_band(b, step)
       end
 
-      -- Release drum notes after a short time
-      clock.run(function()
-        clock.sleep(0.05)
-        for _, b in ipairs(bands) do
-          if b.is_drum then Band.release(b, midi_out) end
-        end
-      end)
+      -- Release drum MIDI notes after a short time (internal drums are one-shot)
+      if drum_output == "midi" then
+        clock.run(function()
+          clock.sleep(0.05)
+          for _, b in ipairs(bands) do
+            if b.is_drum then Band.release(b, midi_out) end
+          end
+        end)
+      end
 
       -- Advance progression on beat boundaries (only when active)
       if step == 1 then
@@ -324,6 +337,21 @@ function init()
     mm:connect(val)
   end)
 
+  params:add_option("drum_output", "Drum Output", {"Internal", "MIDI"}, 1)
+  params:set_action("drum_output", function(val)
+    drum_output = val == 1 and "internal" or "midi"
+  end)
+
+  -- Internal drum kit names
+  local kit_names = {}
+  for i = 1, DrumEngine.num_kits() do
+    kit_names[i] = DrumEngine.kit_name(i)
+  end
+  params:add_option("internal_drum_kit", "Drum Kit", kit_names, 1)
+  params:set_action("internal_drum_kit", function(val)
+    DrumEngine.load_kit(val)
+  end)
+
   params:add_option("key", "Key", NOTE_NAMES, key_idx)
   params:set_action("key", function(val)
     key_idx = val
@@ -394,6 +422,12 @@ function init()
         if db.is_drum then db.drum_kit = kit end
       end
       params:set("drum_kit", kit, true)
+      -- Also cycle internal drum kit
+      if drum_output == "internal" then
+        local ikit = math.floor(val / 128 * DrumEngine.num_kits()) + 1
+        DrumEngine.load_kit(ikit)
+        params:set("internal_drum_kit", ikit, true)
+      end
     end
   end
 
@@ -456,6 +490,9 @@ function init()
 
   -- Set BPM
   params:set("clock_tempo", 120)
+
+  -- Initialize internal drum engine (Timber)
+  DrumEngine.init()
 
   -- Generate initial phrases
   regenerate_all()
