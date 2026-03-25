@@ -753,17 +753,16 @@ function draw_play()
     local x = (i - 1) * col_w + 2
     local selected = (i == cursor)
 
-    -- Activity bar (height = velocity, flash on trigger)
+    -- Activity bar (height = velocity, brightens on trigger)
     local bar_h = 0
-    if b.flash > 0 then
-      bar_h = 38
-    elseif not b.muted and b.velocity > 0 then
-      bar_h = math.floor(b.velocity / 127 * 30)
+    if not b.muted and b.velocity > 0 then
+      bar_h = math.floor(b.velocity / 127 * 38)
     end
 
     if bar_h > 0 then
       local color = Band.ROLE_COLORS[b.role] or 5
-      screen.level(b.flash > 0 and 15 or color)
+      local bright = b.flash > 0 and 15 or color
+      screen.level(bright)
       screen.rect(x, 52 - bar_h, col_w - 2, bar_h)
       screen.fill()
     end
