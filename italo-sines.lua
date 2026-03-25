@@ -597,11 +597,13 @@ function enc(n, d)
     end
 
   elseif page == 2 then
-    -- BANDS page
+    -- BANDS page: E2 = scroll fields, E3 = edit value
     if n == 1 then
       page = util.clamp(page + d, 1, #PAGES)
     elseif n == 2 then
-      cursor = util.clamp(cursor + d, 1, #bands + 1)  -- +1 for "+Band"
+      local max_fields = 8
+      if bands[cursor] and bands[cursor].is_drum then max_fields = 5 end
+      edit_field = util.clamp(edit_field + d, 1, max_fields)
     elseif n == 3 then
       if cursor <= #bands then
         local b = bands[cursor]
@@ -731,26 +733,13 @@ function key(n, z)
 
   elseif page == 2 then
     if n == 2 then
-      if cursor == #bands + 1 then
-        -- Add new band
-        local new_id = "X" .. #bands
-        local new_band = Band.new(new_id, "chord", 1)
-        table.insert(bands, new_band)
-        generate_phrase(new_band)
-      else
-        -- Remove selected band
-        if #bands > 1 then
-          Band.release(bands[cursor], midi_out)
-          Band.panic(bands[cursor], midi_out)
-          table.remove(bands, cursor)
-          cursor = util.clamp(cursor, 1, #bands)
-        end
-      end
+      -- Prev band
+      cursor = util.clamp(cursor - 1, 1, #bands)
+      edit_field = 1
     elseif n == 3 then
-      -- Cycle edit field
-      local max_fields = 8
-      if bands[cursor] and bands[cursor].is_drum then max_fields = 5 end
-      edit_field = (edit_field % max_fields) + 1
+      -- Next band
+      cursor = util.clamp(cursor + 1, 1, #bands)
+      edit_field = 1
     end
 
   elseif page == 3 then
@@ -966,7 +955,7 @@ function draw_bands()
   -- Footer
   screen.level(3)
   screen.move(0, 64)
-  screen.text("K2:remove  K3:field")
+  screen.text("K2:prev  K3:next")
 end
 
 function draw_prog()
