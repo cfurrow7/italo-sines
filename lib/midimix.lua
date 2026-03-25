@@ -176,7 +176,12 @@ end
 -- Update rec arm LED for a slot
 function MidiMix:set_rec_led(slot, on)
   if self.midi and slot >= 1 and slot <= 8 then
-    self.midi:note_on(REC_NOTES[slot], on and 127 or 0, 1)
+    if on then
+      self.midi:note_on(REC_NOTES[slot], 127, 1)
+    else
+      self.midi:note_on(REC_NOTES[slot], 0, 1)
+      self.midi:note_off(REC_NOTES[slot], 0, 1)
+    end
   end
 end
 
