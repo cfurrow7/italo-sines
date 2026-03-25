@@ -215,6 +215,10 @@ function MidiMix:all_leds_off()
     self:set_mute_led(slot, false)
     self:set_rec_led(slot, false)
   end
+  -- Start on page 1
+  self.bank = 0
+  self.midi:note_on(BANK_LEFT_NOTE, 127, 1)
+  self.midi:note_on(BANK_RIGHT_NOTE, 0, 1)
 end
 
 return MidiMix
