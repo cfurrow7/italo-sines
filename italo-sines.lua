@@ -495,11 +495,7 @@ function init()
     if bands[bi] then
       bands[bi].muted = not bands[bi].muted
       if bands[bi].muted then Band.release(bands[bi], midi_out) end
-      -- Delay LED update so it overrides MIDIMIX hardware auto-toggle
-      clock.run(function()
-        clock.sleep(0.05)
-        mm:update_leds(bands)
-      end)
+      -- LED update happens on button release (note_off) in midimix.lua
     end
   end
 
@@ -507,11 +503,7 @@ function init()
     if bands[bi] then
       local b = bands[bi]
       b.arp_mode = (b.arp_mode % #Band.ARP_MODES) + 1
-      -- Delay LED update so it overrides MIDIMIX hardware auto-toggle
-      clock.run(function()
-        clock.sleep(0.05)
-        mm:update_leds(bands)
-      end)
+      -- LED update happens on button release (note_off) in midimix.lua
     end
   end
 

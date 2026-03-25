@@ -151,16 +151,26 @@ function MidiMix:handle_event(data)
       return
     end
 
+    -- Mute/rec: process on note_on, but defer LED update to note_off
     local slot = self._mute_map[note]
     if slot then
       if self.on_mute then self.on_mute(self:band_idx(slot)) end
+      self._pending_led_update = true
       return
     end
 
     slot = self._rec_map[note]
     if slot then
       if self.on_arp_cycle then self.on_arp_cycle(self:band_idx(slot)) end
+      self._pending_led_update = true
       return
+    end
+
+  elseif msg.type == "note_off" or (msg.type == "note_on" and msg.vel == 0) then
+    -- Update LEDs on button release (after hardware is done toggling)
+    if self._pending_led_update then
+      self._pending_led_update = false
+      self:update_leds()
     end
   end
 end
