@@ -28,7 +28,6 @@ DrumEngine.KITS = {
       kick  = "909-BD.wav",
       snare = "909-SD.wav",
       hat   = "909-CH.wav",
-      tom   = "909-LT.wav",
     }
   },
   { name = "TR-606", path = "audio/common/606/",
@@ -37,22 +36,6 @@ DrumEngine.KITS = {
       snare = "606-SD.wav",
       hat   = "606-CH.wav",
       tom   = "606-HT.wav",
-    }
-  },
-  { name = "CR-78", path = "audio/common/cr-78/",
-    samples = {
-      kick  = "CR78-BD.wav",
-      snare = "CR78-SD.wav",
-      hat   = "CR78-MA.wav",
-      tom   = "CR78-TB.wav",
-    }
-  },
-  { name = "DMX", path = "audio/common/dmx/",
-    samples = {
-      kick  = "DMX-BD.wav",
-      snare = "DMX-SD.wav",
-      hat   = "DMX-HH.wav",
-      tom   = "DMX-TM.wav",
     }
   },
 }
