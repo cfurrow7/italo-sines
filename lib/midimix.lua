@@ -185,8 +185,11 @@ function MidiMix:set_rec_led(slot, on)
   end
 end
 
--- Update all LEDs based on band states
+-- Update all LEDs based on band states (caches bands for bank switches)
 function MidiMix:update_leds(bands)
+  if bands then self._bands = bands end
+  bands = bands or self._bands
+  if not bands then return end
   for slot = 1, 8 do
     local bi = self:band_idx(slot)
     if bands[bi] then
@@ -198,6 +201,11 @@ function MidiMix:update_leds(bands)
       self:set_mute_led(slot, false)
       self:set_rec_led(slot, false)
     end
+  end
+  -- Bank indicator LEDs: left = page 1, right = page 2+
+  if self.midi then
+    self.midi:note_on(BANK_LEFT_NOTE, self.bank == 0 and 127 or 0, 1)
+    self.midi:note_on(BANK_RIGHT_NOTE, self.bank > 0 and 127 or 0, 1)
   end
 end
 
