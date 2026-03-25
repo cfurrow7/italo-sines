@@ -72,6 +72,7 @@ end
 
 function MidiMix:connect(device_num)
   self.midi = midi.connect(device_num)
+  print("MIDIMIX connected to device " .. device_num .. " name: " .. (self.midi.name or "unknown"))
   self.midi.event = function(data)
     self:handle_event(data)
   end
@@ -87,6 +88,7 @@ function MidiMix:handle_event(data)
   if msg.type == "cc" then
     local cc = msg.cc
     local val = msg.val
+    print("MIDIMIX CC: " .. cc .. " val: " .. val)
 
     -- Master fader
     if cc == MASTER_CC then
@@ -97,6 +99,7 @@ function MidiMix:handle_event(data)
     -- Per-channel CCs
     local slot = self._fader_map[cc]
     if slot then
+      print("  -> fader slot " .. slot .. " band " .. self:band_idx(slot) .. " val " .. val)
       if self.on_volume then self.on_volume(self:band_idx(slot), val) end
       return
     end
