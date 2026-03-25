@@ -23,7 +23,7 @@ function Band.new(id, role, channel)
     is_drum = is_drum,
 
     -- Volume / state
-    velocity = 100,
+    velocity = 0,         -- start silent, faders bring voices in
     muted = false,
     octave = is_drum and 0 or (role == "bass" and -1 or 0),
 
