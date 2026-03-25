@@ -76,6 +76,15 @@ function MidiMix:connect(device_num)
   self.midi.event = function(data)
     self:handle_event(data)
   end
+  -- Start with all LEDs off
+  self:all_leds_off()
+end
+
+function MidiMix:all_leds_off()
+  if not self.midi then return end
+  for slot = 1, 8 do
+    self:set_mute_led(slot, false)
+  end
 end
 
 function MidiMix:band_idx(slot)
