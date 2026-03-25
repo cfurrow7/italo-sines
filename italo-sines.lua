@@ -543,6 +543,7 @@ function enc(n, d)
         elseif edit_field == 2 then
           -- Channel
           b.channel = util.clamp(b.channel + d, 1, 16)
+          Band.send_pc(b, midi_out)
         elseif edit_field == 3 then
           -- Octave
           b.octave = util.clamp(b.octave + d, -5, 5)
@@ -562,8 +563,14 @@ function enc(n, d)
             params:set("drum_kit", b.drum_kit, true)
           end
         elseif edit_field == 5 then
-          -- Arp mode
-          b.arp_mode = util.clamp(b.arp_mode + d, 1, #Band.ARP_MODES)
+          if b.is_drum then
+            -- Program change (drums)
+            b.program = util.clamp(b.program + d, -1, 127)
+            Band.send_pc(b, midi_out)
+          else
+            -- Arp mode
+            b.arp_mode = util.clamp(b.arp_mode + d, 1, #Band.ARP_MODES)
+          end
         elseif edit_field == 6 then
           -- Arp rate
           b.arp_rate = util.clamp(b.arp_rate + d, 1, #Band.ARP_RATES)
@@ -571,6 +578,10 @@ function enc(n, d)
           -- Degree
           b.degree = util.clamp(b.degree + d, 1, 7)
           if b.role == "bass" or b.role == "lead" then generate_phrase(b) end
+        elseif edit_field == 8 then
+          -- Program change (melodic)
+          b.program = util.clamp(b.program + d, -1, 127)
+          Band.send_pc(b, midi_out)
         end
       end
     end
@@ -669,8 +680,8 @@ function key(n, z)
       end
     elseif n == 3 then
       -- Cycle edit field
-      local max_fields = 7
-      if bands[cursor] and bands[cursor].is_drum then max_fields = 4 end
+      local max_fields = 8
+      if bands[cursor] and bands[cursor].is_drum then max_fields = 5 end
       edit_field = (edit_field % max_fields) + 1
     end
 
@@ -822,12 +833,15 @@ function draw_bands()
   local b = bands[cursor]
   local fields = {}
 
+  local pc_str = b.program < 0 and "off" or tostring(b.program)
+
   if b.is_drum then
     fields = {
       {"vel",  tostring(b.velocity)},
       {"ch",   tostring(b.channel)},
       {"kit",  Drummer.kit_name(b.drum_kit)},
       {"role", b.role},
+      {"PC",   pc_str},
     }
   else
     local pat_name
@@ -847,6 +861,7 @@ function draw_bands()
       {"arp",   Band.ARP_MODES[b.arp_mode]},
       {"rate",  "1/" .. tostring(Band.ARP_RATES[b.arp_rate] * 4)},
       {"deg",   NUMERALS[b.degree] or tostring(b.degree)},
+      {"PC",    pc_str},
     }
   end
 

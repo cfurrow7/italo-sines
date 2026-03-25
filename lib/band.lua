@@ -44,6 +44,9 @@ function Band.new(id, role, channel)
     -- Rhythm (16-step: 1=play, 0=rest)
     rhythm = is_drum and nil or Band._default_rhythm(role),
 
+    -- Program change
+    program = 0,          -- MIDI program (0-127), -1 = don't send
+
     -- Drum kit (shared across all drum bands)
     drum_kit = 1,         -- index into Drummer.KITS
 
@@ -106,6 +109,12 @@ end
 function Band.retrigger(band, midi_out, notes, vel)
   Band.release(band, midi_out)
   Band.trigger(band, midi_out, notes, vel)
+end
+
+-- Send program change
+function Band.send_pc(band, midi_out)
+  if not midi_out or band.program < 0 then return end
+  midi_out:program_change(band.program, band.channel)
 end
 
 -- Check if role is melodic
