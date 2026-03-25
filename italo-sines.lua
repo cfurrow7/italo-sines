@@ -547,6 +547,13 @@ function init()
   -- Initialize internal drum engine (Timber)
   DrumEngine.init()
 
+  -- Send PC 0 (init patch) to all melodic bands on startup
+  for _, b in ipairs(bands) do
+    if not b.is_drum then
+      Band.send_pc(b, midi_out)
+    end
+  end
+
   -- Generate initial phrases
   regenerate_all()
 
