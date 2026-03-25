@@ -43,6 +43,12 @@ DrumEngine.KITS = {
 DrumEngine.current_kit = 1
 DrumEngine.loaded = false
 
+-- Effect state
+DrumEngine.pitch = 1.0       -- pitch ratio (0.5 = -1 oct, 2.0 = +1 oct)
+DrumEngine.filter_freq = 20000  -- filter cutoff Hz
+DrumEngine.filter_reso = 0.1    -- filter resonance
+DrumEngine.filter_type = 0      -- 0=LP, 1=HP, 2=BP
+
 -- Check if a sample file exists, try common naming variations
 local function find_sample(base_path, filename)
   local full = _path.dust .. base_path .. filename
@@ -61,8 +67,43 @@ function DrumEngine.init()
     engine.ampDecay(slot_id, 0.5)
     engine.ampSustain(slot_id, 0)
     engine.ampRelease(slot_id, 0.1)
+    engine.filterFreq(slot_id, 20000)
+    engine.filterReso(slot_id, 0.1)
+    engine.filterType(slot_id, 0)  -- lowpass
   end
   DrumEngine.load_kit(1)
+end
+
+-- Set pitch for all drum slots (ratio: 0.5 = -1 oct, 1.0 = normal, 2.0 = +1 oct)
+function DrumEngine.set_pitch(ratio)
+  DrumEngine.pitch = ratio
+  for _, slot_id in pairs(DrumEngine.SLOTS) do
+    engine.pitchBendSample(slot_id, ratio)
+  end
+end
+
+-- Set filter cutoff for all drum slots (freq in Hz, 20-20000)
+function DrumEngine.set_filter_freq(freq)
+  DrumEngine.filter_freq = freq
+  for _, slot_id in pairs(DrumEngine.SLOTS) do
+    engine.filterFreq(slot_id, freq)
+  end
+end
+
+-- Set filter resonance (0.0 - 1.0)
+function DrumEngine.set_filter_reso(reso)
+  DrumEngine.filter_reso = reso
+  for _, slot_id in pairs(DrumEngine.SLOTS) do
+    engine.filterReso(slot_id, reso)
+  end
+end
+
+-- Set filter type (0=LP, 1=HP, 2=BP)
+function DrumEngine.set_filter_type(t)
+  DrumEngine.filter_type = t
+  for _, slot_id in pairs(DrumEngine.SLOTS) do
+    engine.filterType(slot_id, t)
+  end
 end
 
 -- Load a kit by index

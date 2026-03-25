@@ -379,6 +379,48 @@ function init()
     end
   end)
 
+  -- Drum FX
+  params:add_separator("drum_fx_header", "DRUM FX")
+
+  params:add_control("drum_pitch", "Drum Pitch", controlspec.new(-24, 24, 'lin', 1, 0, 'st'))
+  params:set_action("drum_pitch", function(val)
+    -- Convert semitones to ratio
+    DrumEngine.set_pitch(math.pow(2, val / 12))
+  end)
+
+  params:add_control("drum_filter", "Drum Filter", controlspec.new(60, 20000, 'exp', 0, 20000, 'Hz'))
+  params:set_action("drum_filter", function(val)
+    DrumEngine.set_filter_freq(val)
+  end)
+
+  params:add_control("drum_reso", "Drum Resonance", controlspec.new(0, 1, 'lin', 0.01, 0.1))
+  params:set_action("drum_reso", function(val)
+    DrumEngine.set_filter_reso(val)
+  end)
+
+  params:add_option("drum_filter_type", "Filter Type", {"LP", "HP", "BP"}, 1)
+  params:set_action("drum_filter_type", function(val)
+    DrumEngine.set_filter_type(val - 1)
+  end)
+
+  -- Reverb (norns built-in)
+  params:add_separator("reverb_header", "REVERB")
+
+  params:add_control("reverb_level", "Reverb Level", controlspec.new(0, 1, 'lin', 0.01, 0.3))
+  params:set_action("reverb_level", function(val)
+    audio.level_eng_rev(val)
+  end)
+
+  params:add_control("reverb_time", "Reverb Time", controlspec.new(0.1, 15, 'exp', 0.1, 3, 's'))
+  params:set_action("reverb_time", function(val)
+    audio.rev_param("t60", val)
+  end)
+
+  params:add_control("reverb_damp", "Reverb Damp", controlspec.new(500, 16000, 'exp', 0, 4000, 'Hz'))
+  params:set_action("reverb_damp", function(val)
+    audio.rev_param("damp", val)
+  end)
+
   -- ===== MIDIMIX =====
   mm = MidiMix.new()
 
@@ -394,13 +436,18 @@ function init()
   end
 
   mm.on_degree = function(bi, val)
-    if not bands[bi] or not Band.is_melodic(bands[bi].role) then return end
+    if not bands[bi] then return end
     local b = bands[bi]
-    if b.role == "bass" then
+    if b.is_drum and drum_output == "internal" then
+      -- Knob 1 for drums = pitch (-24 to +24 semitones)
+      local st = math.floor(val / 127 * 48) - 24
+      DrumEngine.set_pitch(math.pow(2, st / 12))
+      params:set("drum_pitch", st, true)
+    elseif b.role == "bass" then
       -- Knob 1 for bass = octave (-5 to +5)
       b.octave = math.floor(val / 128 * 11) - 5
       generate_phrase(b)
-    else
+    elseif Band.is_melodic(b.role) then
       -- Knob 1 for chord/lead = degree
       b.degree = math.floor(val / 128 * 7) + 1
       if b.role == "lead" then generate_phrase(b) end
@@ -430,8 +477,16 @@ function init()
   end
 
   mm.on_arp_rate = function(bi, val)
-    if bands[bi] then
-      bands[bi].arp_rate = math.floor(val / 128 * #Band.ARP_RATES) + 1
+    if not bands[bi] then return end
+    local b = bands[bi]
+    if b.is_drum and drum_output == "internal" then
+      -- Knob 3 for drums = filter cutoff (log scale 60Hz-20kHz)
+      local freq = 60 * math.pow(20000/60, val/127)
+      if val == 127 then freq = 20000 end
+      DrumEngine.set_filter_freq(freq)
+      params:set("drum_filter", freq, true)
+    else
+      b.arp_rate = math.floor(val / 128 * #Band.ARP_RATES) + 1
     end
   end
 
