@@ -168,11 +168,12 @@ function MidiMix:set_mute_led(slot, on)
 end
 
 -- Update all mute LEDs based on band states
+-- LED on = unmuted AND velocity > 0
 function MidiMix:update_leds(bands)
   for slot = 1, 8 do
     local bi = self:band_idx(slot)
     if bands[bi] then
-      self:set_mute_led(slot, not bands[bi].muted)
+      self:set_mute_led(slot, not bands[bi].muted and bands[bi].velocity > 0)
     else
       self:set_mute_led(slot, false)
     end

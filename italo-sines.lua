@@ -432,6 +432,7 @@ function init()
       if midi_out then
         midi_out:cc(7, val, bands[bi].channel)
       end
+      mm:update_leds(bands)
     end
   end
 
