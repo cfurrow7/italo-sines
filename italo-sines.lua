@@ -578,6 +578,12 @@ function init()
       redraw()
     end
   end)
+
+  -- Set MIDIMIX LEDs to match initial band state (after hardware settles)
+  clock.run(function()
+    clock.sleep(0.2)
+    mm:update_leds(bands)
+  end)
 end
 
 -- ===== CONTROLS =====
