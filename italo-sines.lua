@@ -943,19 +943,23 @@ function draw_bands()
   screen.move(128, 16)
   screen.text_right(cursor .. "/" .. #bands)
 
-  -- Fields
+  -- Fields (scrollable: 5 visible rows max)
+  local max_visible = 5
+  local scroll_offset = math.max(0, edit_field - max_visible)
   for i, f in ipairs(fields) do
-    local y = 24 + (i - 1) * 7
-    if y > 60 then break end
-    local selected = (edit_field == i)
-    screen.level(selected and 15 or 5)
-    screen.move(4, y)
-    screen.text(f[1])
-    screen.move(40, y)
-    screen.text(f[2])
-    if selected then
-      screen.move(0, y)
-      screen.text(">")
+    local row = i - scroll_offset
+    if row >= 1 and row <= max_visible then
+      local y = 24 + (row - 1) * 7
+      local selected = (edit_field == i)
+      screen.level(selected and 15 or 5)
+      screen.move(4, y)
+      screen.text(f[1])
+      screen.move(40, y)
+      screen.text(f[2])
+      if selected then
+        screen.move(0, y)
+        screen.text(">")
+      end
     end
   end
 
