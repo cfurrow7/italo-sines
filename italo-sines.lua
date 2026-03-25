@@ -408,27 +408,9 @@ function init()
   mm.on_knob2 = function(bi, val)
     if not bands[bi] then return end
     local b = bands[bi]
-    if b.role == "chord" then
-      b.chord_type = math.floor(val / 128 * #Chords.TYPES) + 1
-    elseif b.role == "bass" then
-      b.melody_pattern = math.floor(val / 128 * #Melody.BASS_PATTERNS) + 1
-      generate_phrase(b)
-    elseif b.role == "lead" then
-      b.melody_pattern = math.floor(val / 128 * #Melody.PATTERNS) + 1
-      generate_phrase(b)
-    elseif b.is_drum then
-      local kit = math.floor(val / 128 * Drummer.num_kits()) + 1
-      for _, db in ipairs(bands) do
-        if db.is_drum then db.drum_kit = kit end
-      end
-      params:set("drum_kit", kit, true)
-      -- Also cycle internal drum kit
-      if drum_output == "internal" then
-        local ikit = math.floor(val / 128 * DrumEngine.num_kits()) + 1
-        DrumEngine.load_kit(ikit)
-        params:set("internal_drum_kit", ikit, true)
-      end
-    end
+    -- Knob row 2 = Program Change (0-127)
+    b.program = math.floor(val / 128 * 128)
+    Band.send_pc(b, midi_out)
   end
 
   mm.on_arp_rate = function(bi, val)

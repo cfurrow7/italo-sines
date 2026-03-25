@@ -106,7 +106,7 @@ Switch between internal and MIDI drum output in PARAMS. When using internal drum
 
 ```
  KNOB ROW 1:  degree  degree  degree  degree  degree  degree  degree  degree
- KNOB ROW 2:  chType  chType  melody  melody  melody  kit     kit     kit
+ KNOB ROW 2:    PC      PC      PC      PC      PC      PC      PC      PC
  KNOB ROW 3:  arpRt   arpRt   arpRt   arpRt   arpRt   arpRt   arpRt   arpRt
 
  MUTE:        [on/off per band]
