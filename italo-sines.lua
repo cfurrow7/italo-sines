@@ -73,6 +73,7 @@ local edit_field = 1       -- which field is being edited
 local prog_cursor = 1      -- cursor on PROG page
 local flash = {}           -- per-band visual flash
 local adding_band = false  -- "+Band" mode
+local last_touched = nil   -- {band_idx, param, value, time} from MIDIMIX
 
 -- ===== SCALE =====
 
@@ -384,6 +385,7 @@ function init()
   mm.on_volume = function(bi, val)
     if bands[bi] then
       bands[bi].velocity = val
+      last_touched = {idx = bi, val = val}
       -- Also send CC 7 (volume) so synths that ignore velocity still respond
       if midi_out then
         midi_out:cc(7, val, bands[bi].channel)
@@ -787,15 +789,16 @@ function draw_play()
     end
   end
 
-  -- Bottom: velocity of selected band
-  if bands[cursor] then
-    screen.level(5)
-    screen.move(0, 64)
+  -- Bottom: show last-touched MIDIMIX fader, or selected band
+  screen.level(5)
+  screen.move(0, 64)
+  if last_touched and bands[last_touched.idx] then
+    local b = bands[last_touched.idx]
+    screen.level(12)
+    screen.text(b.id .. " vel:" .. last_touched.val)
+  elseif bands[cursor] then
     local b = bands[cursor]
     screen.text(b.id .. " vel:" .. b.velocity)
-    if b.arp_mode > 1 then
-      screen.text(" arp:" .. Band.ARP_MODES[b.arp_mode])
-    end
   end
 end
 
