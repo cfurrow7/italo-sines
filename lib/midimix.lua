@@ -173,16 +173,34 @@ function MidiMix:set_mute_led(slot, on)
   end
 end
 
--- Update all mute LEDs based on band states
--- LED on = unmuted AND velocity > 0
+-- Update rec arm LED for a slot
+function MidiMix:set_rec_led(slot, on)
+  if self.midi and slot >= 1 and slot <= 8 then
+    self.midi:note_on(REC_NOTES[slot], on and 127 or 0, 1)
+  end
+end
+
+-- Update all LEDs based on band states
 function MidiMix:update_leds(bands)
   for slot = 1, 8 do
     local bi = self:band_idx(slot)
     if bands[bi] then
+      -- Mute LED: on = unmuted AND velocity > 0
       self:set_mute_led(slot, not bands[bi].muted and bands[bi].velocity > 0)
+      -- Rec arm LED: on = arp active (mode > 1)
+      self:set_rec_led(slot, bands[bi].arp_mode and bands[bi].arp_mode > 1)
     else
       self:set_mute_led(slot, false)
+      self:set_rec_led(slot, false)
     end
+  end
+end
+
+function MidiMix:all_leds_off()
+  if not self.midi then return end
+  for slot = 1, 8 do
+    self:set_mute_led(slot, false)
+    self:set_rec_led(slot, false)
   end
 end
 

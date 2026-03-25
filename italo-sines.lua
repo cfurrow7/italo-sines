@@ -503,6 +503,7 @@ function init()
     if bands[bi] then
       local b = bands[bi]
       b.arp_mode = (b.arp_mode % #Band.ARP_MODES) + 1
+      mm:update_leds(bands)
     end
   end
 
