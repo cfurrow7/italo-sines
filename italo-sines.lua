@@ -28,8 +28,10 @@ local Drummer = include("italo-sines/lib/drummer")
 local DrumEngine = include("italo-sines/lib/drum_engine")
 local Progressions = include("italo-sines/lib/progressions")
 local MidiMix = include("italo-sines/lib/midimix")
+local nb = require("nb/lib/nb")
 
 local drum_output = "internal"  -- "internal" = Timber engine, "midi" = MIDI out
+local MAX_NB_BANDS = 9
 
 -- ===== CONSTANTS =====
 
@@ -139,6 +141,61 @@ local function regenerate_all()
 end
 
 
+-- ===== NB HELPERS =====
+
+function get_nb_player(band_idx)
+  if band_idx < 1 or band_idx > MAX_NB_BANDS then return nil end
+  local p = params:lookup_param("band_" .. band_idx .. "_voice")
+  if p then return p:get_player() end
+  return nil
+end
+
+local function nb_release(band_idx)
+  local b = bands[band_idx]
+  if not b then return end
+  local player = get_nb_player(band_idx)
+  if player then
+    for _, n in ipairs(b.nb_sounding) do
+      player:note_off(n)
+    end
+  end
+  b.nb_sounding = {}
+end
+
+local function nb_trigger(band_idx, notes, vel)
+  local b = bands[band_idx]
+  if not b then return end
+  nb_release(band_idx)
+  local player = get_nb_player(band_idx)
+  if player then
+    local v = (vel or b.velocity) / 127
+    for _, n in ipairs(notes) do
+      if n > 0 and n <= 127 then
+        player:note_on(n, v)
+        b.nb_sounding[#b.nb_sounding + 1] = n
+      end
+    end
+    b.flash = 4
+  end
+end
+
+-- Unified trigger: routes to nb or MIDI based on band output
+local function band_trigger(band_idx, b, notes, vel)
+  if b.output == "nb" then
+    nb_trigger(band_idx, notes, vel)
+  else
+    Band.retrigger(b, midi_out, notes, vel)
+  end
+end
+
+local function band_release(band_idx, b)
+  if b.output == "nb" then
+    nb_release(band_idx)
+  else
+    Band.release(b, midi_out)
+  end
+end
+
 -- ===== CLOCK =====
 
 local function advance_progression()
@@ -147,14 +204,19 @@ local function advance_progression()
   regenerate_all()
 end
 
-local function tick_band(b, step)
+local function tick_band(b, step, band_idx)
   if b.muted or b.velocity < 1 then return end
+
+  local use_nb = (b.output == "nb")
 
   if b.is_drum then
     local vel = Drummer.get_vel(b.drum_kit, b.role, step)
     if vel > 0 then
       local combined_vel = math.floor(vel * b.velocity / 127)
-      if drum_output == "internal" then
+      if use_nb then
+        local note = Band.DRUM_NOTES[b.role] or 36
+        nb_trigger(band_idx, {note}, combined_vel)
+      elseif drum_output == "internal" then
         DrumEngine.trigger(b.role, combined_vel)
         b.flash = 4
       else
@@ -174,7 +236,7 @@ local function tick_band(b, step)
         local mode_name = Band.ARP_MODES[b.arp_mode] or "up"
         local note = Chords.arp_note(chord_notes, b.arp_pos, mode_name, 2)
         if note then
-          Band.retrigger(b, midi_out, {note}, b.velocity)
+          band_trigger(band_idx, b, {note}, b.velocity)
           b.arp_pos = b.arp_pos + 1
         end
       end
@@ -184,7 +246,7 @@ local function tick_band(b, step)
       local idx = ((step - 1) % #rhythm) + 1
       if rhythm[idx] == 1 then
         local chord_notes = build_chord(b)
-        Band.retrigger(b, midi_out, chord_notes, b.velocity)
+        band_trigger(band_idx, b, chord_notes, b.velocity)
       end
     end
     return
@@ -200,7 +262,7 @@ local function tick_band(b, step)
           local mode_name = Band.ARP_MODES[b.arp_mode] or "up"
           local note = Chords.arp_note(b.phrase, b.arp_pos, mode_name, 2)
           if note then
-            Band.retrigger(b, midi_out, {note}, b.velocity)
+            band_trigger(band_idx, b, {note}, b.velocity)
             b.arp_pos = b.arp_pos + 1
           end
         end
@@ -214,9 +276,9 @@ local function tick_band(b, step)
           b.phrase_pos = (b.phrase_pos % #b.phrase) + 1
           local note = b.phrase[b.phrase_pos]
           if note and note > 0 then
-            Band.retrigger(b, midi_out, {note}, b.velocity)
+            band_trigger(band_idx, b, {note}, b.velocity)
           else
-            Band.release(b, midi_out)
+            band_release(band_idx, b)
           end
         end
       end
@@ -247,19 +309,23 @@ local function start_clock()
 
       -- Clock always runs (free-running, like midi-sines)
       -- Tick all bands
-      for _, b in ipairs(bands) do
-        tick_band(b, step)
+      for i, b in ipairs(bands) do
+        tick_band(b, step, i)
       end
 
-      -- Release drum MIDI notes after a short time (internal drums are one-shot)
-      if drum_output == "midi" then
-        clock.run(function()
-          clock.sleep(0.05)
-          for _, b in ipairs(bands) do
-            if b.is_drum then Band.release(b, midi_out) end
+      -- Release drum notes after a short time (internal drums are one-shot)
+      clock.run(function()
+        clock.sleep(0.05)
+        for i, b in ipairs(bands) do
+          if b.is_drum then
+            if b.output == "nb" then
+              nb_release(i)
+            elseif drum_output == "midi" then
+              Band.release(b, midi_out)
+            end
           end
-        end)
-      end
+        end
+      end)
 
       -- Advance progression on beat boundaries (only when active)
       if step == 1 then
@@ -278,9 +344,15 @@ local function start_clock()
 end
 
 local function all_off()
-  for _, b in ipairs(bands) do
+  for i, b in ipairs(bands) do
+    nb_release(i)
     Band.release(b, midi_out)
     Band.panic(b, midi_out)
+  end
+  -- Kill all nb voices
+  for i = 1, MAX_NB_BANDS do
+    local player = get_nb_player(i)
+    if player and player.stop_all then player:stop_all() end
   end
 end
 
@@ -305,6 +377,9 @@ end
 -- ===== INIT =====
 
 function init()
+  -- Init nb voice system
+  nb:init()
+
   -- Create default bands
   bands = Band.default_set()
 
@@ -420,6 +495,24 @@ function init()
   params:set_action("reverb_damp", function(val)
     audio.rev_param("damp", val)
   end)
+
+  -- ===== NB VOICES =====
+  params:add_separator("nb_header", "NB VOICES")
+
+  for i = 1, MAX_NB_BANDS do
+    local b = bands[i]
+    local label = b and b.id or ("Band " .. i)
+
+    params:add_option("band_" .. i .. "_output", label .. " Output", {"MIDI", "nb"}, 1)
+    params:set_action("band_" .. i .. "_output", function(val)
+      if bands[i] then
+        bands[i].output = val == 2 and "nb" or (bands[i].is_drum and "internal" or "midi")
+      end
+    end)
+
+    nb:add_param("band_" .. i .. "_voice", label .. " Voice")
+  end
+  nb:add_player_params()
 
   -- ===== MIDIMIX =====
   mm = MidiMix.new()

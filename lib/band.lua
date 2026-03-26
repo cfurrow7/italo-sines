@@ -50,8 +50,12 @@ function Band.new(id, role, channel)
     -- Drum kit (shared across all drum bands)
     drum_kit = 1,         -- index into Drummer.KITS
 
+    -- Output mode: "midi", "nb", "internal" (drums default)
+    output = is_drum and "internal" or "midi",
+
     -- State
     sounding = {},        -- array of currently sounding MIDI notes
+    nb_sounding = {},     -- notes currently sounding via nb
     flash = 0,            -- visual flash counter
   }
 end
