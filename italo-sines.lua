@@ -608,18 +608,57 @@ function init()
   mm.on_panic = function() all_off() end
 
   mm.on_bank_left = function()
-    mm.bank = math.max(0, mm.bank - 1)
     mm:update_leds(bands)
   end
 
   mm.on_bank_right = function()
-    local max_bank = math.floor((#bands - 1) / 8)
-    mm.bank = math.min(max_bank, mm.bank + 1)
     mm:update_leds(bands)
   end
 
   mm.on_play_stop = function()
     toggle_progression()
+  end
+
+  -- ===== SYNTH PAGE CALLBACKS =====
+
+  -- Mute on synth page: toggle output MIDI/nb
+  mm.on_synth_output = function(slot)
+    local b = bands[slot]
+    if not b then return end
+    if b.output == "nb" then
+      b.output = b.is_drum and "internal" or "midi"
+      print("Band " .. slot .. " -> " .. b.output)
+    else
+      b.output = "nb"
+      print("Band " .. slot .. " -> nb voice")
+    end
+  end
+
+  -- Knob 1 on synth page: MIDI channel (1-16)
+  mm.on_synth_ch = function(slot, ch)
+    local b = bands[slot]
+    if not b then return end
+    b.channel = ch
+    print("Band " .. slot .. " ch -> " .. ch)
+  end
+
+  -- Knob 2 on synth page: nb modulation (0-127)
+  mm.on_synth_mod = function(slot, val)
+    local player = get_nb_player(slot)
+    if player then
+      player:modulate(val / 127)
+    end
+  end
+
+  -- Knob 3 on synth page: nb pitch bend (0-127, center=64)
+  mm.on_synth_bend = function(slot, val)
+    local b = bands[slot]
+    if not b then return end
+    local player = get_nb_player(slot)
+    if player and #b.nb_sounding > 0 then
+      local amount = (val - 64) / 64  -- -1 to +1
+      player:pitch_bend(b.nb_sounding[1], amount)
+    end
   end
 
   -- Auto-detect MIDI devices
